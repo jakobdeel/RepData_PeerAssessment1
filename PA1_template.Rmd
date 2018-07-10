@@ -2,29 +2,196 @@
 title: "Week 2 Assignment Markdown"
 author: "Jakob Deel"
 date: "July 7, 2018"
-output: html_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Loading and Processing data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+The code below loads and processes the data, sets up the working directory  
+and loads all relevant libraries
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r}
+#sets working directory and removes unnecessary objects
+setwd("C:/Users/jdeel/Documents/Training/JHU - Coursera/Reproducible Research/Week 2 Assignment")
+rm(list = ls())
 
-```{r cars}
-summary(cars)
+library(ggplot2)
+library(dplyr)
+
+#loads and processes data
+stepdata <- read.csv("activity.csv")
+
+stepdata$date <- as.Date(as.character(stepdata$date), format = "%Y-%m-%d")
 ```
 
-## Including Plots
+## Section 1: Total Steps Per Day
 
-You can also embed plots, for example:
+The below code calculates the number of steps taken per day
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+dates <- unique(stepdata$date)
+steps <- numeric(length = 61)
+stepsperday <- data.frame(dates,steps)
+
+for (dat in dates) {
+  stepsperday[dates==dat,2] <- with(subset(stepdata,date==dat),
+                                    sum(steps, na.rm = TRUE))
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The below code generates a histogram and reports the mean and median  
+number of steps taken per day
+
+```{r}
+#generates histogram
+hist(stepsperday$steps,
+     main = "Histogram of Steps per Day",
+     xlab = "Number of Steps Taken per Day")
+
+#reports mean and median of steps taken per day
+print(paste("Mean Steps per Day = ",mean(stepsperday$steps),sep = ""))
+print(paste("Median Steps per Day = ",median(stepsperday$steps),sep = ""))
+```
+
+## Section 2: What is the daily activity pattern?
+
+The below code calculates the average steps taken per interval
+
+```{r}
+interval <- unique(stepdata$interval)
+avgsteps <- numeric(length = 288)
+stepsperint <- data.frame(interval,avgsteps)
+
+for (int in interval) {
+  stepsperint[interval==int,2] <- with(subset(stepdata,interval==int),
+                                       mean(steps, na.rm = TRUE))
+}
+```
+
+The below code creates a line plot and reports the interval with the highest  
+number of average steps taken per day
+
+```{r}
+# creates line plot
+plot <- ggplot(data = stepsperint, aes(x=interval,y=avgsteps))
+plot <- plot + geom_line(aes(x=interval,y=avgsteps))
+plot <- plot + labs(title = "Average Steps Taken per 5-minute Interval")
+plot <- plot + xlab("5-Minute Daily Interval")
+plot <- plot + ylab("Average Steps Taken in Interval each Day")
+plot
+
+#reports interval with max avg steps taken per day
+maxsteps = max(stepsperint$avgsteps)
+print(paste("Interval with Most Avg. Steps per Day = ",
+            with(subset(stepsperint,avgsteps==maxsteps),print(interval)),
+            sep = ""))
+```
+
+## Section 3: Imputing Missing Values
+
+The below code calculates and reports the number of rows in the original  
+data with missing values
+
+```{r}
+print(paste("Total Number of Rows with Missing Step Data = ",
+            sum(is.na(stepdata$steps)),
+            sep = ""))
+```
+
+The below code imputes missing values using the overall mean for the  
+corresponding 5-minute interval that is missing
+
+```{r}
+impstepdata <- stepdata
+impstepdata$dateinterval <- paste(as.character(impstepdata$date),
+                                  as.character(impstepdata$interval))
+for (datint in impstepdata$dateinterval) {
+  if (is.na(impstepdata[impstepdata$dateinterval==datint,1])) {
+    impstepdata[impstepdata$dateinterval==datint,1] <- with(subset(stepsperint,
+                                                                   interval==impstepdata[impstepdata$dateinterval==datint,3]),
+                                                            avgsteps)
+  }
+}
+```
+
+The below code repeats calculations for total number of steps taken per day  
+with the new, imputed dataset
+
+```{r}
+#calculates steps per day
+impstepsperday <- data.frame(dates,steps)
+
+for (dat in dates) {
+  impstepsperday[dates==dat,2] <- with(subset(impstepdata,date==dat),
+                                    sum(steps, na.rm = TRUE))
+}
+
+#generates histogram
+hist(impstepsperday$steps,
+     main = "Histogram of Steps per Day (with imputed values)",
+     xlab = "Number of Steps Taken per Day")
+
+#reports mean and median of steps taken per day
+print(paste("Mean Steps per Day (with imputed values) = ",
+            mean(impstepsperday$steps),sep = ""))
+print(paste("Median Steps per Day (with imputed values) = ",
+            median(impstepsperday$steps),sep = ""))
+```
+
+
+## Section 4: Weekends
+
+The below code creates a new factor variable in the imputed dataset  
+designating weekend days from weekdays
+
+```{r}
+impstepdata$weekday <- weekdays(impstepdata$date)
+impstepdata$weekend <- factor(character(length=17568))
+
+impstepdata$weekend <- "WEEKDAY"
+impstepdata$weekend[which(impstepdata$weekday == "Saturday")] <- "WEEKEND"
+impstepdata$weekend[which(impstepdata$weekday == "Sunday")] <- "WEEKEND"
+
+impstepdata$weekend <- as.factor(impstepdata$weekend)
+```
+
+The below code creates a panel line plot comparing average steps taken  
+in each 5-minute interval on weekends and weekdays
+
+```{r}
+#calculates steps per interval, weekdays vs. weekends
+wdstepsperint <- data.frame(interval,avgsteps)
+wdstepsperint <- mutate(wdstepsperint,weekend="WEEKDAY")
+
+for (int in interval) {
+  wdstepsperint[interval==int,2] <- with(subset(impstepdata,interval==int &
+                                                            weekend=="WEEKDAY"),
+                                       mean(steps, na.rm = TRUE))
+}
+
+westepsperint <- data.frame(interval,avgsteps)
+westepsperint <- mutate(westepsperint,weekend="WEEKEND")
+
+for (int in interval) {
+  westepsperint[interval==int,2] <- with(subset(impstepdata,interval==int &
+                                                  weekend=="WEEKEND"),
+                                         mean(steps, na.rm = TRUE))
+}
+
+wesstepsperint <- full_join(wdstepsperint,westepsperint)
+
+#creates panel plot
+plot <- ggplot(data = wesstepsperint, aes(x=interval,y=avgsteps))
+plot <- plot + geom_line(aes(x=interval,y=avgsteps))
+plot <- plot + facet_grid(as.factor(weekend) ~ .)
+plot <- plot + labs(title = "Average Steps Taken per 5-minute Interval")
+plot <- plot + xlab("5-Minute Daily Interval")
+plot <- plot + ylab("Average Steps Taken in Interval each Day")
+plot
+```

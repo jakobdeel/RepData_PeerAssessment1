@@ -2,7 +2,9 @@
 title: "Week 2 Assignment Markdown"
 author: "Jakob Deel"
 date: "July 7, 2018"
-output: html_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}

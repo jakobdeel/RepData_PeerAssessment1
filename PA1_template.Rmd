@@ -4,6 +4,7 @@ author: "Jakob Deel"
 date: "July 7, 2018"
 output:
   html_document:
+    keep_md: true
     df_print: paged
 ---
 
